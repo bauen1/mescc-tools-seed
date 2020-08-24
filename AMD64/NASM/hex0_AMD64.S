@@ -17,6 +17,13 @@
 	section .text
 	global _start
 
+; Register usage:
+;
+; r9 => input file
+; r10 => output file
+; r14 => temp
+; r15 => flag
+
 ; Where the ELF Header is going to hit
 ; Simply jump to _start
 ; Our main function
@@ -77,40 +84,35 @@ print:
 	jmp loop
 
 hex:
-	; Purge Comment Lines (#)
-	cmp rax, 35
+
+	; Purge Comment Lines '#' (35)
+	cmp rax, '#'
 	je purge_comment
 
-	; Purge Comment Lines (;)
-	cmp rax, 59
+	; Purge Comment Lines ';' (59)
+	cmp rax, ';'
 	je purge_comment
 
-	; deal all ascii less than 0
-	cmp rax, 48
-	jl ascii_other
+	; Deal with '0' (48) - '9' (57)
+	sub rax, '0'
+	cmp rax, 9
+	jbe .done
 
-	; deal with 0-9
-	cmp rax, 58
-	jl ascii_num
-
-	; deal with all ascii less than A
-	cmp rax, 65
-	jl ascii_other
-
-	; deal with A-F
-	cmp rax, 71
-	jl ascii_high
-
-	;deal with all ascii less than a
-	cmp rax, 97
-	jl ascii_other
-
-	;deal with a-f
-	cmp rax, 103
-	jl ascii_low
+	; Turn 'a' - 'f' into 'A' - 'F'
+	and rax, ~0x20
+	sub rax, 'A' - '0'
+	cmp rax, 5
+	jbe .done_add_10
 
 	; The rest that remains needs to be ignored
-	jmp ascii_other
+	mov rax, -1
+
+.done:
+	ret
+
+.done_add_10:
+    add rax, 10
+    ret
 
 purge_comment:
 	; Read a byte
@@ -121,22 +123,6 @@ purge_comment:
 	jne purge_comment
 
 	; Otherwise return -1
-	mov rax, -1
-	ret
-
-ascii_num:
-	sub rax, 48
-	ret
-
-ascii_low:
-	sub rax, 87
-	ret
-
-ascii_high:
-	sub rax, 55
-	ret
-
-ascii_other:
 	mov rax, -1
 	ret
 
@@ -170,7 +156,6 @@ Read_byte:
 	mov al, [input]             ; load char
 	movzx rax, al               ; We have to zero extend it to use it
 	ret
-
 
 section .data
 ELF_end:
